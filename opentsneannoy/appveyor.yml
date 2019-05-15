@@ -1,0 +1,16 @@
+# https://packaging.python.org/guides/supporting-windows-using-appveyor/
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python36"
+    - PYTHON: "C:\\Python36-x64"
+
+install:
+  - "%PYTHON%\\python.exe -m pip install numpy"
+  - "%PYTHON%\\python.exe setup.py develop"
+  - "%PYTHON%\\python.exe -m pip install pytest"
+
+build: off
+
+test_script:
+  - "%PYTHON%\\Scripts\\pytest -v"
