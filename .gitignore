@@ -1,5 +1,5 @@
 # ignore python cache folder
-#__pycache__
+__pycache__/
 
 # local, offline "trash"
-#__old__
+old/
