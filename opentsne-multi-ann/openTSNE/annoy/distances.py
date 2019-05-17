@@ -1,6 +1,11 @@
 # Author: Leland McInnes <leland.mcinnes@gmail.com>
 #
 # License: BSD 3 clause
+
+# still to do here:
+# add dot distance
+# change cosine to angular in the right fashion, since angular is the preferred input of annoy
+
 import numpy as np
 import numba
 
