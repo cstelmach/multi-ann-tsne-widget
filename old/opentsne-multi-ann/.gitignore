@@ -1,8 +1,0 @@
-.idea/
-venv/
-build/
-*.so
-*.egg-info/
-__pycache__/
-dist/
-.ipynb_checkpoints/
