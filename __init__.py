@@ -2,11 +2,11 @@
 Widgets from Evaluate category
 
 """
-NAME = "bakk"
+NAME = "Bakk Stelmach"
 
-DESCRIPTION = "Bachelor Thesis t-SNE Orange Plugin"
+DESCRIPTION = "Bachelor Thesis Multi ANN t-SNE"
 
-BACKGROUND = "#8dc47b"
+BACKGROUND = "#CC6262"
 
 ICON = "icons/Category-Evaluate.svg"
 
