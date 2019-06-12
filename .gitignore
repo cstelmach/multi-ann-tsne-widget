@@ -1,6 +1,9 @@
 #old
 old/
 
+# Mac
+.DS_Store
+DS_Store
 
 
 # CS: gitignore template from https://github.com/github/gitignore/
