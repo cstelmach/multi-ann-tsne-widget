@@ -2,10 +2,12 @@ from openTSNE.nearest_neighbors import KNNIndex
 import annoy
 import numpy as np
 
+from Orange.widgets.bakk.additional_files.parameters import init_method_param
+
 class Annoy(KNNIndex):
     #VALID_METRICS = neighbors.Annoy.valid_metrics
 
-    def build(self, data):
+    def build(self, data, k):
         n_items, vector_length = data.shape
         #initalize parameters
         method_param = init_method_param("annoy", data)
@@ -16,7 +18,7 @@ class Annoy(KNNIndex):
             self.index.add_item(i, data[i])
         self.index.build(ntrees)
 
-    def query_train(self, data, k):
+        #   def query_train(self, data, k):
         #add search_k parameter: tradeoff between speed and accuracy?
         #neighbors_single, distances_single = np.asarray(self.index.get_nns_by_vector(data[i], n=k, search_k=-1, include_distances=True))
         #output array with points x neighbors:

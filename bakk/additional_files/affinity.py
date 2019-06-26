@@ -13,45 +13,45 @@ import openTSNE
 from openTSNE import nearest_neighbors
 from openTSNE.affinity import PerplexityBasedNN, joint_probabilities_nn, MultiscaleMixture, FixedSigmaNN
 
-#from Orange.widgets.bakk.additional_files.algorithms import annoy, nearpy, nmslib
+from Orange.widgets.bakk.additional_files.algorithms import annoy, nearpy, nmslib
 
 
 
 def build_knn_index(
-    data, method, metric, metric_params=None, n_jobs=1, random_state=None
+    data, method, k, metric, metric_params=None, n_jobs=1, random_state=None
 ):
     methods = {
         #"exact_alt": nearest_neighbors.VPTree,
         # old / openTSNE basic:
-        "exact": nearest_neighbors.BallTree,
-        "approx": nearest_neighbors.NNDescent,
+        #"exact": nearest_neighbors.BallTree,
+        #"approx": nearest_neighbors.NNDescent,
         #cs: options for ann algorithms
         # new / Multi-ANN:
         "nndescent": nearest_neighbors.NNDescent,
         "balltree": nearest_neighbors.BallTree,
         #"annoy": multi_nearest_neighbors.Annoy, (if filelocation in sumfile)
-        #"annoy": algorithms.annoy.Annoy (if filelocation in folder)
-        #"annoy": annoy.Annoy,
-        #"hnsw": algorithms.Hnsw,
-        #"sw-graph": algorithms.SWGraph,
-        #"vp-tree": Nmslib("vp-tree"),
-        #"napp": Nmslib("napp"),
-        #"simple_invindx": Nmslib("simple_invindx"),
-        #"brute_force": BruteForce,
+        #"annoy": algorithms.annoy.Annoy, #(if filelocation in folder)
+        "annoy": annoy.Annoy,
+        "hnsw": nmslib.Hnsw,
+        "sw-graph": nmslib.SWGraph,
+        #"vp-tree": nmslib.VPTree,
+        #"napp": nmslib.napp,
+        #"simple_invindx": nmslib.SimpleInvindx,
+        "brute_force": nmslib.BruteForce,
         #"hnswlib": Hnswlib,
         #"rpforest": RPForest,
         #"flann": FLANN,
         #"onng": ONNG,
-        #"nearpy": NearPy,
+        "nearpy": nearpy.NearPy,
     }
     if isinstance(method, nearest_neighbors.KNNIndex):
         knn_index = method
 
     elif method not in methods:
         raise ValueError(
-            "Unrecognized nearest neighbor algorithm `%s`. "
-            "Please choose one of the supported methods or "
-            "provide a valid `KNNIndex` instance." % method
+            "Unrecognized nearest neighbor algorithm `%s`. Please choose one "
+            "of the supported methods or provide a valid `KNNIndex` instance."
+            % method
         )
     else:
         knn_index = methods[method](
@@ -61,9 +61,10 @@ def build_knn_index(
             random_state=random_state,
         )
 
-    knn_index.build(data)
+    neighbors, distances = knn_index.build(data, k=k)
 
-    return knn_index
+    return knn_index, neighbors, distances
+
 
 class MultiANNPerplexityBasedNN(PerplexityBasedNN):
     """Compute affinities using nearest neighbors.
@@ -84,22 +85,21 @@ class MultiANNPerplexityBasedNN(PerplexityBasedNN):
         self.n_samples = data.shape[0]
         self.perplexity = self.check_perplexity(perplexity)
 
-        self.knn_index = build_knn_index(
-            data, method, metric, metric_params, n_jobs, random_state
-        )
+        # self.knn_index = build_knn_index(
+        #     data, method, metric, metric_params, n_jobs, random_state
+        # )
+        #
+        # # Find and store the nearest neighbors so we can reuse them if the
+        # # perplexity is ever lowered
+        # k_neighbors = min(self.n_samples - 1, int(3 * self.perplexity))
+        # self.__neighbors, self.__distances = self.knn_index.query_train(
+        #     data, k=k_neighbors
+        # )
 
-        # Find and store the nearest neighbors so we can reuse them if the
-        # perplexity is ever lowered
         k_neighbors = min(self.n_samples - 1, int(3 * self.perplexity))
-        self.__neighbors, self.__distances = self.knn_index.query_train(
-            data, k=k_neighbors
+        self.knn_index, self.__neighbors, self.__distances = build_knn_index(
+            data, method, k_neighbors, metric, metric_params, n_jobs, random_state
         )
-        #print("Neighbors:")
-        #print(self.__neighbors)
-        #print(len(self.__neighbors))
-        #print("Distances:")
-        #print(self.__distances)
-        #print(len(self.__distances[0]))
 
         self.P = joint_probabilities_nn(
             self.__neighbors,

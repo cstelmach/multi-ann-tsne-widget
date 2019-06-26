@@ -281,7 +281,8 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
     left_side_scrolling = True
 
     # cs
-    neighbor_method_index = ["nndescent", "balltree", "annoy", "hnsw", "bruteforce", "nearpy", "exact", "approx"]
+    neighbor_method_index = ["nndescent", "balltree", "annoy", "hnsw",
+    "sw-graph", "brute_force", "nearpy" ] #"exact", "approx"]
     neighbor_method = ContextSetting(0)
 
     # Use `invalidated` descriptor so we don't break the usage of

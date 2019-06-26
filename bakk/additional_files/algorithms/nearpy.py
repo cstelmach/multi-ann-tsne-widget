@@ -1,13 +1,16 @@
 from openTSNE.nearest_neighbors import KNNIndex
 import nearpy
+import numpy as np
 from nearpy.filters import NearestFilter
 import sklearn.preprocessing
+
+from Orange.widgets.bakk.additional_files.parameters import init_method_param
 
 class NearPy(KNNIndex):
     #VALID_METRICS = neighbors.NearPy.valid_metrics
     #METHOD_PARAMS = neighbors.NearPy.params (text/config file)
 
-    def build(self, data):
+    def build(self, data, k):
         n_items, vector_length = data.shape
         print(data.shape)
         #parameters init
@@ -41,7 +44,7 @@ class NearPy(KNNIndex):
         for i, x in enumerate(data):
             self.index.store_vector(x, i)
 
-    def query_train(self, data, k):
+        # def query_train(self, data, k):
         self.filter.N = k
         #if self.metric == 'angular':
             #data = sklearn.preprocessing.normalize([data], axis=1, norm='l2')[0]
