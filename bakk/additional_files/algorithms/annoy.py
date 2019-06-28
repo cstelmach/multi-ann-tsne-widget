@@ -28,11 +28,11 @@ class Annoy(KNNIndex):
             neighbors_single, distances_single = np.asarray(self.index.get_nns_by_item(i, n=k, search_k=-1 ,include_distances=True))
             neighbors[i] = neighbors_single
             distances[i] = distances_single
-        print("neighbors.shape: {}".format(neighbors.shape))
-        print("neighbors[0]: {}".format(neighbors[0]))
-        print(neighbors.shape)
-        print("distances.shape: {}".format(distances.shape))
-        print("distances[0]: {}".format(distances[0]))
+        #print("neighbors.shape: {}".format(neighbors.shape))
+        #print("neighbors[0]: {}".format(neighbors[0]))
+        #print(neighbors.shape)
+        #print("distances.shape: {}".format(distances.shape))
+        #print("distances[0]: {}".format(distances[0]))
         return neighbors, distances
 
     def query(self, query, k):

@@ -21,28 +21,16 @@ def build_knn_index(
     data, method, k, metric, metric_params=None, n_jobs=1, random_state=None
 ):
     methods = {
-        #"exact_alt": nearest_neighbors.VPTree,
-        # old / openTSNE basic:
-        #"exact": nearest_neighbors.BallTree,
-        #"approx": nearest_neighbors.NNDescent,
-        #cs: options for ann algorithms
-        # new / Multi-ANN:
-        "nndescent": nearest_neighbors.NNDescent,
-        "balltree": nearest_neighbors.BallTree,
-        #"annoy": multi_nearest_neighbors.Annoy, (if filelocation in sumfile)
-        #"annoy": algorithms.annoy.Annoy, #(if filelocation in folder)
-        "annoy": annoy.Annoy,
-        "hnsw": nmslib.Hnsw,
-        "sw-graph": nmslib.SWGraph,
+        "NNDescent": nearest_neighbors.NNDescent,
+        "BallTree": nearest_neighbors.BallTree,
+        "Annoy": annoy.Annoy,
+        "Hnsw": nmslib.Hnsw,
+        "SW-Graph": nmslib.SWGraph,
         #"vp-tree": nmslib.VPTree,
-        #"napp": nmslib.napp,
+        "NAPP": nmslib.NAPP,
         #"simple_invindx": nmslib.SimpleInvindx,
-        "brute_force": nmslib.BruteForce,
-        #"hnswlib": Hnswlib,
-        #"rpforest": RPForest,
-        #"flann": FLANN,
-        #"onng": ONNG,
-        "nearpy": nearpy.NearPy,
+        "Brute Force": nmslib.BruteForce,
+        "NearPy": nearpy.NearPy,
     }
     if isinstance(method, nearest_neighbors.KNNIndex):
         knn_index = method

@@ -72,7 +72,7 @@ class NearPy(KNNIndex):
         distances = np.empty((query.shape[0],k))
 
         for i in range(len(query)):
-            item_single = self.index.neighbours(data[i])
+            item_single = self.index.neighbours(query[i])
             dp_n = []
             dp_d = []
             for j in range(len(item_single)):
