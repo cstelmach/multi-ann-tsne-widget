@@ -10,11 +10,11 @@ class NearPy(KNNIndex):
     #VALID_METRICS = neighbors.NearPy.valid_metrics
     #METHOD_PARAMS = neighbors.NearPy.params (text/config file)
 
-    def build(self, data, k):
+    def build(self, data, k, cp):
         n_items, vector_length = data.shape
-        print(data.shape)
+        #print(data.shape)
         #parameters init
-        method_param = init_method_param("nearpy")
+        method_param = init_method_param("nearpy", data=data, cp=cp)
         hash_counts = method_param["hash_counts"]
         n_bits = method_param["n_bits"]
 

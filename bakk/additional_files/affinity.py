@@ -32,24 +32,26 @@ def build_knn_index(
         "Brute Force": nmslib.BruteForce,
         "NearPy": nearpy.NearPy,
     }
-    if isinstance(method, nearest_neighbors.KNNIndex):
-        knn_index = method
+    if isinstance(method['method'], nearest_neighbors.KNNIndex):
+        knn_index = method['method']
 
-    elif method not in methods:
+    elif method['method'] not in methods:
         raise ValueError(
             "Unrecognized nearest neighbor algorithm `%s`. Please choose one "
             "of the supported methods or provide a valid `KNNIndex` instance."
             % method
         )
     else:
-        knn_index = methods[method](
+        knn_index = methods[method['method']](
             metric=metric,
             metric_params=metric_params,
             n_jobs=n_jobs,
             random_state=random_state,
         )
-
-    neighbors, distances = knn_index.build(data, k=k)
+    if method['method'] == 'NNDescent' or method['method'] == 'BallTree':
+        neighbors, distances = knn_index.build(data, k=k)
+    else:
+        neighbors, distances = knn_index.build(data, k=k, cp=method['param'])
 
     return knn_index, neighbors, distances
 

@@ -7,11 +7,11 @@ from Orange.widgets.bakk.additional_files.parameters import init_method_param
 class Annoy(KNNIndex):
     #VALID_METRICS = neighbors.Annoy.valid_metrics
 
-    def build(self, data, k):
+    def build(self, data, k, cp):
         n_items, vector_length = data.shape
         #initalize parameters
-        method_param = init_method_param("annoy", data)
-        ntrees = method_param["ntrees"]
+        self.method_param = init_method_param("annoy", data=data, cp=cp)
+        ntrees = self.method_param["n_trees"]
         #build index
         self.index = annoy.AnnoyIndex(vector_length, metric=self.metric)
         for i in range(n_items):
@@ -39,7 +39,7 @@ class Annoy(KNNIndex):
         neighbors = np.empty((query.shape[0],k), dtype=int)
         distances = np.empty((query.shape[0],k))
         for i in range(len(query)):
-            neighbors_single, distances_single = np.asarray(self.index.get_nns_by_vector(query[i], n=k, search_k=-1, include_distances=True))
+            neighbors_single, distances_single = np.asarray(self.index.get_nns_by_vector(query[i], n=k, search_k=self.method_param['search_k'], include_distances=True))
             neighbors[i] = neighbors_single
             distances[i] = distances_single
         return neighbors, distances

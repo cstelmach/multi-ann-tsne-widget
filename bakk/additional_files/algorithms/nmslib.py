@@ -9,10 +9,10 @@ from Orange.widgets.bakk.additional_files.parameters import init_method_param
 class Hnsw(KNNIndex):
     #VALID_METRICS = neighbors.Nmslib.valid_metrics
 
-    def build(self, data, k):
+    def build(self, data, k, cp):
         n_items, vector_length = data.shape
         self._method_name = "hnsw"
-        method_param = init_method_param(self._method_name, data)
+        method_param = init_method_param(self._method_name, k=k, cp=cp)
         self._index_param = method_param["index_param"]
         self._index_param["indexThreadQty"] = self.n_jobs
         self._query_param = method_param["query_param"]
@@ -46,10 +46,10 @@ class Hnsw(KNNIndex):
 class SWGraph(KNNIndex):
     #VALID_METRICS = neighbors.Nmslib.valid_metrics
 
-    def build(self, data, k):
+    def build(self, data, k, cp):
         n_items, vector_length = data.shape
         self._method_name = "sw-graph"
-        method_param = init_method_param(self._method_name, data)
+        method_param = init_method_param(self._method_name, k=k, cp=cp)
         self._index_param = method_param["index_param"]
         self._index_param["indexThreadQty"] = self.n_jobs
         self._query_param = method_param["query_param"]
@@ -84,13 +84,13 @@ class SWGraph(KNNIndex):
 class NAPP(KNNIndex):
     #VALID_METRICS = neighbors.Nmslib.valid_metrics
 
-    def build(self, data, k):
+    def build(self, data, k, cp):
         n_items, vector_length = data.shape
         self._method_name = "napp"
-        method_param = init_method_param(self._method_name, data)
+        method_param = init_method_param(self._method_name, data=data, cp=cp)
         self._index_param = method_param["index_param"]
         self._index_param["indexThreadQty"] = self.n_jobs
-        self._query_param = method_param["query_param"]
+        #self._query_param = method_param["query_param"]
         self._metric = {
         'angular': 'cosinesimil', 'euclidean': 'l2'}[self.metric]
 
@@ -98,7 +98,7 @@ class NAPP(KNNIndex):
             space=self._metric, method=self._method_name, data_type=nmslib.DataType.DENSE_VECTOR, dtype=nmslib.DistType.FLOAT)
         self.index.addDataPointBatch(data)
         self.index.createIndex(self._index_param)
-        self.index.setQueryTimeParams(self._query_param)
+        self.index.setQueryTimeParams()#self._query_param)
 
         # def query_train(self, data, k):
         result = np.asarray(self.index.knnQueryBatch(data, k))
@@ -193,7 +193,7 @@ class NAPP(KNNIndex):
 class BruteForce(KNNIndex):
     #VALID_METRICS = neighbors.Nmslib.valid_metrics
 
-    def build(self, data, k):
+    def build(self, data, k, cp):
         n_items, vector_length = data.shape
         self._method_name = "brute_force"
         self._metric = {

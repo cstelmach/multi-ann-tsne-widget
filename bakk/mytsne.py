@@ -44,7 +44,7 @@ class Task(namespace):
     affinities = None       # type: Optional[openTSNE.affinity.Affinities]
     tsne_embedding = None   # type: Optional[manifold.TSNEModel]
     iterations_done = 0     # type: int
-
+    method_param_dict = None # type: Optional[Dict]
     # These attributes need not be set by the widget
     tsne = manifold.MultiANNTSNE             # type: Optional[manifold.TSNE]
 
@@ -58,7 +58,8 @@ def pca_preprocessing(data, n_components, normalize):
     return model(data)
 
 
-def prepare_tsne_obj(data, perplexity, multiscale, exaggeration, neighbor_method):
+def prepare_tsne_obj(data, perplexity, multiscale, exaggeration,
+                    neighbor_method, method_param_dict):
     # type: (Table, float, bool, float) -> manifold.TSNE
     """Automatically determine the best parameters for the given data set."""
     # Compute perplexity settings for multiscale
@@ -69,7 +70,19 @@ def prepare_tsne_obj(data, perplexity, multiscale, exaggeration, neighbor_method
         perplexity = perplexity
 
     # cs
-    neighbor_method = neighbor_method
+    neighbor_indextokey = {0:'NNDescent',
+                            1:'BallTree',
+                            2:'Annoy',
+                            3:'NearPy',
+                            4:'Hnsw',
+                            5:'SW-Graph',
+                            6:'NAPP',
+                            7:'Brute Force'}
+
+    neighbor_method = neighbor_indextokey[neighbor_method]
+    method_param = method_param_dict[neighbor_method]
+    neigbhbor_method_plus_param = {'method':neighbor_method,
+                                    'param':method_param}
 
     # Determine whether to use settings for large data sets
     if n_samples > 10_000:
@@ -92,7 +105,7 @@ def prepare_tsne_obj(data, perplexity, multiscale, exaggeration, neighbor_method
         early_exaggeration_iter=early_exagg_iter,
         n_iter=n_iter,
         exaggeration=exaggeration,
-        neighbors=neighbor_method,
+        neighbors=neigbhbor_method_plus_param,
         negative_gradient_method=gradient_method,
         theta=0.8,
         random_state=0,
@@ -191,7 +204,8 @@ class TSNERunner:
 
         # Prepare the tsne object and add it to the spec
         task.tsne = prepare_tsne_obj(
-            task.data, task.perplexity, task.multiscale, task.exaggeration, task.neighbor_method
+            task.data, task.perplexity, task.multiscale, task.exaggeration,
+            task.neighbor_method, task.method_param_dict
         )
 
         job_queue = []
@@ -270,7 +284,7 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
     settings_version = 4
     perplexity = ContextSetting(30)
     multiscale = ContextSetting(False)
-    exaggeration = ContextSetting(1)
+    exaggeration = ContextSetting(2)
     pca_components = ContextSetting(_DEFAULT_PCA_COMPONENTS)
     normalize = ContextSetting(True)
 
@@ -283,12 +297,14 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
     # cs
     neighbor_method_index = ["NNDescent", "BallTree", "Annoy", "NearPy", "Hnsw",
     "SW-Graph", "NAPP", "Brute Force"] #"exact", "approx"]
-    neighbor_method = ContextSetting(0)
+    neighbor_method = 7
+
+
 
     # parameters
     #merging = ContextSetting(0)
 
-    #: Kernel types
+    #: Kernel types<
     #Linear, Poly, RBF, Sigmoid = range(4)
     #: Selected kernel type
     #kernel_type = ContextSetting(RBF)
@@ -299,7 +315,8 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
     #: coef0 (adative constant)
     #coef0 = ContextSetting(0.0)
 
-    search_k = ContextSetting(-100)
+    search_k = ContextSetting(-1)
+    n_trees = ContextSetting(0)
     n_bits = ContextSetting(0)
     hash_counts = ContextSetting(0)
     hnsw_efC = ContextSetting(0)
@@ -311,8 +328,10 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
     swg_efS = ContextSetting(0)
     numPivot = ContextSetting(0)
     numPivotIndex = ContextSetting(0)
+    hashTrickDim = ContextSetting(0)
 
     _default_value = "default"
+    _auto_value = "auto"
     # kernels = (("Linear", "x⋅y"),
     #            ("Polynomial", "(g x⋅y + c)<sup>d</sup>"),
     #            ("RBF", "exp(-g|x-y|²)"),
@@ -324,6 +343,7 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
     # 'M' = 15, 'efConstruction' = 100, 'efSearch' = 100,
     # }
     #search_k = ContextSetting(-1)
+    method_param_dict = None
 
     # Use `invalidated` descriptor so we don't break the usage of
     # `_invalidated` in `OWDataProjectionWidget`, but still allow finer control
@@ -362,69 +382,6 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
             verticalSpacing=10,
         )
 
-        # Method dropdown
-        self.method_combo = gui.comboBox(
-            box, self, "neighbor_method", orientation=Qt.Horizontal,
-            label="ANN:", items=[i for i in self.neighbor_method_index],
-            callback=self._on_ann_changed)#, sendSelectedValue=True)
-
-        self.para_box = []
-        self._add_ann_box()
-        self.para_box[0].hide()
-
-        # grp = gui.radioButtonsInBox(
-        #     self.controlArea, self, "merging", box="Approximate Nearest Neighbors:",
-        #     callback=self.change_merging)
-        #self.attr_boxes = []
-
-        # def add_option(label):
-        #     gui.appendRadioButton(grp, label)
-        #     vbox = gui.vBox(grp)
-        #     box = gui.hBox(vbox)
-        #     self.attr_boxes.append(box)
-        #     if label == 'Annoy':
-        #         para = gui.spin(vbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="search_k:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-        #     elif label == 'NearPy':
-        #         para = gui.spin(hbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="n_bits:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-        #         para = gui.spin(hbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="hash_counts:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-        #     elif label == 'Hnsw':
-        #         para = gui.spin(hbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="efC:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-        #         gui.separator(hbox)
-        #         para = gui.spin(hbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="M:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-        #         gui.separator(box, 10)
-        #         para = gui.spin(hbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="post:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-        #         para = gui.spin(vbox, self, 'search_k', -10, 10,
-        #         orientation=Qt.Horizontal, label="efS:", alignment=Qt.AlignRight,
-        #         callback=self._invalidate_affinities)
-        #         para.setFixedWidth(50)
-
-        # add_option("NNDescent")
-        # add_option("BallTree")
-        # add_option("Annoy")
-        # add_option("NearPy")
-        # add_option("Hnsw")
-        # add_option("SW-Graph")
-        # add_option("NAPP")
-        # add_option("Brute Force")
-
         self.perplexity_spin = gui.spin(
             box, self, "perplexity", 1, 500, step=1, alignment=Qt.AlignRight,
             callback=self._invalidate_affinities,
@@ -461,127 +418,115 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
         gui.separator(box, 10)
         self.run_button = gui.button(box, self, "Start", callback=self._toggle_run)
 
-
+        self.para_box = []
+        self._add_ann_box()
+        self.para_box[0].hide()
     #####
 
     def _add_ann_box(self):
         # Initialize with the widest label to measure max width
-        self.ann_eq = self.neighbor_method_index[-1]#[1]
+        #self.ann_eq = self.neighbor_method_index[-1]#[1]
 
-        box = gui.hBox(self.controlArea, str(self.neighbor_method))
+        box = gui.hBox(self.controlArea, "Approximate Nearest Neighbor Algorithm")
 
-        #self.ann_box = buttonbox = gui.radioButtonsInBox(
-        #    box, self, "neighbor_method", btnLabels=[n for n in self.neighbor_method_index],
-        #    callback=self._on_ann_changed, addSpace=20)
-        #buttonbox.layout().setSpacing(10)
-        #gui.rubber(buttonbox)
+        # Method dropdown
+        self.method_combo = gui.comboBox(
+            box, self, "neighbor_method", orientation=Qt.Horizontal,
+             items=[i for i in self.neighbor_method_index],
+            callback=self._on_ann_changed)#, sendSelectedValue=True)
 
         parambox = gui.vBox(box)
-        #gui.label(parambox, self, "Kernel: %(kernel_eq)s")
         common = dict(orientation=Qt.Horizontal, callback=self._invalidate_affinities,
-                      alignment=Qt.AlignRight, controlWidth=80)
+                      alignment=Qt.AlignRight, controlWidth=80, spinType="int")
         spbox = gui.hBox(parambox)
-        gui.rubber(spbox)
+        #gui.rubber(spbox)
         inbox = gui.vBox(spbox)
         self.para_box.append(inbox)
         # Annoy
-        #if self.neighbor_method == 'Annoy':
-        search_k = gui.doubleSpin(
-            inbox, self, "search_k", -100, 100, 1, label=" sk: ", **common)
-        search_k.setSpecialValueText(self._default_value)
+        search_k_spin = gui.spin(
+            inbox, self, "search_k", -10000, 10000, step=1, label=" sk: ", **common)
+        search_k_spin.setSpecialValueText(self._default_value)
+        n_trees_spin = gui.spin(
+            inbox, self, "n_trees", 0, 10000, step=1, label=" nt: ", **common)
+        n_trees_spin.setSpecialValueText(self._auto_value)
 
         # NearPy
-        n_bits = gui.doubleSpin(
-            inbox, self, "n_bits", 1, 100, 1, label=" nb: ", **common)
-        n_bits.setSpecialValueText(self._default_value)
-        hash_counts = gui.doubleSpin(
-            inbox, self, "hash_counts", 1, 100, 1, label=" hc: ", **common)
-        hash_counts.setSpecialValueText(self._default_value)
+        n_bits_spin = gui.spin(
+            inbox, self, "n_bits", 0, 10000, step=1, label=" nb: ", **common)
+        n_bits_spin.setSpecialValueText(self._default_value)
+        hash_counts_spin = gui.spin(
+            inbox, self, "hash_counts", 0, 10000, step=1, label=" hc: ", **common)
+        hash_counts_spin.setSpecialValueText(self._default_value)
 
-        #Hnsw + SW-Graph
-        hnsw_efC = gui.doubleSpin(
-            inbox, self, "hnsw_efC", 1, 1000, 1, label=" efC: ", **common)
-        hnsw_efC.setSpecialValueText(self._default_value)
-        M = gui.doubleSpin(
-            inbox, self, "M", 1, 100, 1, label=" M: ", **common)
-        M.setSpecialValueText(self._default_value)
-        post = gui.doubleSpin(
-            inbox, self, "post", 1, 100, 1, label=" post: ", **common)
-        post.setSpecialValueText(self._default_value)
-        hnsw_efS = gui.doubleSpin(
-            inbox, self, "hnsw_efS", 1, 1000, 1, label=" efS: ", **common)
-        hnsw_efS.setSpecialValueText(self._default_value)
+        # Hnsw
+        hnsw_efC_spin = gui.spin(
+            inbox, self, "hnsw_efC", 0, 3000, step=1, label=" efC: ", **common)
+        hnsw_efC_spin.setSpecialValueText(self._auto_value)
+        M_spin = gui.spin(
+            inbox, self, "M", 0, 200, step=1, label=" M: ", **common)
+        M_spin.setSpecialValueText(self._auto_value)
+        post_spin = gui.spin(
+            inbox, self, "post", 0, 2, step=1, label=" post: ", **common)
+        post_spin.setSpecialValueText(self._default_value)
+        hnsw_efS_spin = gui.spin(
+            inbox, self, "hnsw_efS", 0, 3000, step=1, label=" efS: ", **common)
+        hnsw_efS_spin.setSpecialValueText(self._auto_value)
 
-        #Hnsw + SW-Graph
-        swg_efC = gui.doubleSpin(
-            inbox, self, "swg_efC", 1, 1000, 1, label=" efC: ", **common)
-        swg_efC.setSpecialValueText(self._default_value)
-        NN = gui.doubleSpin(
-            inbox, self, "NN", 1, 100, 1, label=" NN: ", **common)
-        NN.setSpecialValueText(self._default_value)
-        swg_efS = gui.doubleSpin(
-            inbox, self, "swg_efS", 1, 1000, 1, label=" efS: ", **common)
-        swg_efS.setSpecialValueText(self._default_value)
+        #SW-Graph
+        swg_efC_spin = gui.spin(
+            inbox, self, "swg_efC", 0, 3000, step=1, label=" efC: ", **common)
+        swg_efC_spin.setSpecialValueText(self._auto_value)
+        NN_spin = gui.spin(
+            inbox, self, "NN", 0, 200, step=1, label=" NN: ", **common)
+        NN_spin.setSpecialValueText(self._auto_value)
+        swg_efS_spin = gui.spin(
+            inbox, self, "swg_efS", 0, 3000, step=1, label=" efS: ", **common)
+        swg_efS_spin.setSpecialValueText(self._auto_value)
 
         #NAPP
-        numPivot = gui.doubleSpin(
-            inbox, self, "numPivot", 1, 100000, 1, label=" nP: ", **common)
-        numPivot.setSpecialValueText(self._default_value)
-        numPivotIndex = gui.doubleSpin(
-            inbox, self, "numPivotIndex", 1, 100000, 1, label=" nPI: ", **common)
-        numPivotIndex.setSpecialValueText(self._default_value)
+        numPivot_spin = gui.spin(
+            inbox, self, "numPivot", 0, 999999, step=1, label=" nP: ", **common)
+        numPivot_spin.setSpecialValueText(self._auto_value)
+        numPivotIndex_spin = gui.spin(
+            inbox, self, "numPivotIndex", 0, 999999, step=1, label=" nPI: ", **common)
+        numPivotIndex_spin.setSpecialValueText(self._auto_value)
+        hashTrickDim_spin = gui.spin(
+            inbox, self, "hashTrickDim", 0, 999999, step=1, label=" hTD: ", **common)
+        hashTrickDim_spin.setSpecialValueText(self._default_value)
 
-        #
-         # = gui.doubleSpin(
-         #    inbox, self, "", 0.0, 10.0, 0.01, label=" : ", **common)
 
-        # gamma = gui.doubleSpin(
-        #     inbox, self, "gamma", 0.0, 10.0, 0.01, label=" g: ", **common)
-        # gamma.setSpecialValueText(self._default_value)
-        # coef0 = gui.doubleSpin(
-        #     inbox, self, "coef0", 0.0, 10.0, 0.01, label=" c: ", **common)
-        # degree = gui.doubleSpin(
-        #     inbox, self, "degree", 0.0, 10.0, 0.5, label=" d: ", **common)
-
-        # self.method_param_dict = {
-        #     'NearPy':{'n_bits':n_bits, 'hash_counts':hash_counts},
-        #     'Hnsw':{'index_param':{'M':M, 'efConstruction': efC, 'post':post} ,
-        #             'search_param':{'efSearch':efS}},
-        #     'SW-Graph':{'index_param':{'NN':NN, 'efConstruction': efC} ,
-        #             'search_param':{'efSearch':efS}},
-        #     'NAPP': {'index_param':{'numPivot':numPivot,
-        #                             'numPivotIndex': numPivotIndex} ,
-        #             'search_param':{'efSearch':efS}}
-        #     }
 
         # self._kernel_params = [gamma, coef0, degree]
-        self._ann_params = [search_k, n_bits, hash_counts, hnsw_efC, M, post,
-                                hnsw_efS, swg_efC, NN, swg_efS, numPivot, numPivotIndex]
-        gui.rubber(parambox)
-
+        self._ann_params = [search_k_spin, n_trees_spin, n_bits_spin,
+        hash_counts_spin, hnsw_efC_spin, M_spin, post_spin, hnsw_efS_spin,
+        swg_efC_spin, NN_spin, swg_efS_spin, numPivot_spin, numPivotIndex_spin,
+        hashTrickDim_spin]
+        #gui.rubber(parambox)
+        # print(self.method_param_dict)
+        # method_param_dict = self.get_method_param_dict(self._ann_params)
         # This is the maximal height (all double spins are visible)
         # and the maximal width (the label is initialized to the widest one)
         box.layout().activate()
-        box.setFixedHeight(box.sizeHint().height())
+        # box.setFixedHeight(box.height(100))#sizeHint().height())
         box.setMinimumWidth(box.sizeHint().width())
 
     def _show_right_kernel(self):
-        enabled = [[False, False, False, False, False, False,
-                    False, False, False, False, False, False], # NNDescent
-                    [False, False, False, False, False, False,
-                    False, False, False, False, False, False], # BallTree
-                    [True, False, False, False, False, False,
-                    False, False, False, False, False, False], # Annoy
-                    [False, True, True, False, False, False,
-                    False, False, False, False, False, False], # NearPy
-                    [False, False, False, True, True, True,
-                    True, False, False, False, False, False], # Hnsw
-                    [False, False, False, False, False, False,
-                    False, True, True, True, False, False], # SW-Graph
-                    [False, False, False, False, False, False,
-                    False, False, False, False, True, True], # NAPP
-                    [False, False, False, False, False, False,
-                    False, False, False, False, False, False] #Brute Foce
+        enabled = [[False, False, False, False, False, False, False,
+                    False, False, False, False, False, False, False], # NNDescent
+                    [False, False, False, False, False, False, False,
+                    False, False, False, False, False, False, False], # BallTree
+                    [True, True, False, False, False, False, False,
+                    False, False, False, False, False, False, False], # Annoy
+                    [False, False, True, True, False, False, False,
+                    False, False, False, False, False, False, False], # NearPy
+                    [False, False, False, False, True, True, True,
+                    True, False, False, False, False, False, False], # Hnsw
+                    [False, False, False, False, False, False, False,
+                    False, True, True, True, False, False, False], # SW-Graph
+                    [False, False, False, False, False, False, False,
+                    False, False, False, False, True, True, True], # NAPP
+                    [False, False, False, False, False, False, False,
+                    False, False, False, False, False, False, False] #Brute Foce
                     ]
 
         self.ann_eq = self.neighbor_method_index[self.neighbor_method]#[1]
@@ -597,35 +542,27 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
         self.Outputs.support_vectors.send(sv)
 
     def _on_ann_changed(self):
-        if self.neighbor_method == 2:# or self.neighbor_method =='Annoy':
+        if self.neighbor_method != 0:# or self.neighbor_method =='Annoy':
             self.para_box[0].show()
         self._show_right_kernel()
         self._invalidate_affinities()
         #self.settings_changed()
 
+    # def get_method_param_dict(self, ap):
+    #     #[search_k, n_bits, hash_counts, hnsw_efC, M, post,
+    #     #hnsw_efS, swg_efC, NN, swg_efS, numPivot, numPivotIndex]
+    #     method_param_dict = {'NNDescent': False,
+    #     'BallTree': False,
+    #     'Annoy': {'search_k': ap[0]},
+    #     'NearPy':{'nb':ap[1], 'hash_counts':ap[2]},
+    #     'Hnsw':{'index_param':{'M':ap[3], 'efConstruction': ap[4], 'post':ap[5]} ,
+    #             'search_param':{'efSearch':ap[6]}},
+    #     'SW-Graph':{'index_param':{'NN':ap[7], 'efConstruction': ap[8]} ,
+    #             'search_param':{'efSearch':ap[9]}},
+    #     'NAPP': {'index_param':{'numPivot':ap[10], 'numPivotIndex': ap[11]},
+    #     'Brute Force': False}}
+    #     return method_param_dict
 
-    #####
-
-    def set_merging(self):
-        # pylint: disable=invalid-sequence-index
-        # all boxes should be hidden before one is shown, otherwise widget's
-        # layout changes height
-        for box in self.attr_boxes:
-            box.hide()
-
-        self.attr_boxes[self.merging].show()
-
-    def change_merging(self):
-        self.set_merging()
-        self._invalidate()
-
-    def _invalidate(self):
-        """
-        """
-
-    def hide_all(self):
-        for box in self.attr_boxes:
-            box.hide()
 
     #####
 
@@ -786,6 +723,17 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
         if self.data is None:
             return
 
+        self.method_param_dict = {'NNDescent': False,
+        'BallTree': False,
+        'Annoy': {'search_k': self.search_k, 'n_trees': self.n_trees},
+        'NearPy':{'n_bits':self.n_bits, 'hash_counts':self.hash_counts},
+        'Hnsw':{'M':self.M, 'hnsw_efConstruction': self.hnsw_efC, 'post':self.post,
+                'hnsw_efSearch':self.hnsw_efS},
+        'SW-Graph':{'NN':self.NN, 'swg_efConstruction':self.swg_efC, 'swg_efSearch':self.swg_efS},
+        'NAPP': {'numPivot':self.numPivot, 'numPivotIndex': self.numPivotIndex,
+                'hashTrickDim':self.hashTrickDim},
+        'Brute Force': False}
+
         task = Task(
             data=self.data,
             normalize=self.normalize,
@@ -799,6 +747,7 @@ class OWtSNE(OWDataProjectionWidget, ConcurrentWidgetMixin):
             affinities=self.affinities,
             tsne_embedding=self.tsne_embedding,
             iterations_done=self.iterations_done,
+            method_param_dict=self.method_param_dict
         )
         return self.start(TSNERunner.run, task)
 
